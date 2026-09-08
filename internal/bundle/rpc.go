@@ -3,19 +3,18 @@ package bundle
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 	"net/http"
-
 
 	"erc4337-bundler/internal/validation"
 	"erc4337-bundler/pkg/types"
 
 	"github.com/ethereum/go-ethereum"
-	"github.com/ethereum/go-ethereum/accounts/abi"
+	//"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
-
+	//"github.com/ethereum/go-ethereum/crypto"
 )
 
 type RPCRequest struct {
@@ -53,6 +52,8 @@ func (b *Bundler) HandleRPC(w http.ResponseWriter, r *http.Request) {
 		b.handleEstimateGas(w, req)
 	case "eth_getUserOperationReceipt":
 		b.handleGetReceipt(w, req)
+	case "eth_getTransactionReceipt":
+		b.handleGetTransactionReceipt(w, req)
 	case "eth_supportedEntryPoints":
 		writeResult(w, req.ID, []string{b.entryPoint.Hex()})
 	default:
@@ -90,7 +91,7 @@ func (b *Bundler) handleSendUserOperation(w http.ResponseWriter, req RPCRequest)
 		return
 	}
 
-	hash := GetUserOpHash(op, b.entryPoint, b.chainID)
+	hash := types.GetUserOpHash(op, b.entryPoint, b.chainID)
 	writeResult(w, req.ID, hash.Hex())
 }
 
@@ -217,90 +218,31 @@ func (b *Bundler) handleGetReceipt(w http.ResponseWriter, req RPCRequest) {
 	writeResult(w, req.ID, resp)
 }
 
-// GetUserOpHash computes the EIP-4337 userOpHash:
-//
-//	userOpHash = keccak256(abi.encode(hash(pack(op)), entryPoint, chainId))
-//
-// where pack(op) ABI-encodes the op with initCode/callData/paymasterAndData
-// replaced by their keccak256 hashes (per the EntryPoint reference impl).
-func GetUserOpHash(op types.UserOperation, entryPoint common.Address, chainID *big.Int) common.Hash {
-	packed, err := packUserOp(op)
+func (b *Bundler) handleGetTransactionReceipt(w http.ResponseWriter, req RPCRequest) {
+	var params []string
+	if err := json.Unmarshal(req.Params, &params); err != nil || len(params) < 1 {
+		writeError(w, req.ID, -32602, "invalid params")
+		return
+	}
+ 
+	txHash := common.HexToHash(params[0])
+ 
+	ctx := context.Background()
+	receipt, err := b.client.TransactionReceipt(ctx, txHash)
 	if err != nil {
-		// Hashing a well-formed UserOperation should never fail; a failure
-		// here indicates a static ABI-encoding bug, not a runtime/user error.
-		panic(fmt.Sprintf("packUserOp: %v", err))
+		if errors.Is(err, ethereum.NotFound) {
+			// Not mined (or doesn't exist) — spec says return null, not an error.
+			writeResult(w, req.ID, nil)
+			return
+		}
+		writeError(w, req.ID, -32603, "failed to fetch tx receipt: "+err.Error())
+		return
 	}
-	opHash := crypto.Keccak256(packed)
-
-	addressTy, _ := abi.NewType("address", "", nil)
-	bytes32Ty, _ := abi.NewType("bytes32", "", nil)
-	uint256Ty, _ := abi.NewType("uint256", "", nil)
-
-	outerArgs := abi.Arguments{
-		{Type: bytes32Ty},
-		{Type: addressTy},
-		{Type: uint256Ty},
-	}
-
-	var opHash32 [32]byte
-	copy(opHash32[:], opHash)
-
-	encoded, err := outerArgs.Pack(opHash32, entryPoint, chainID)
-	if err != nil {
-		panic(fmt.Sprintf("pack userOpHash outer encoding: %v", err))
-	}
-
-	return common.BytesToHash(crypto.Keccak256(encoded))
+ 
+	writeResult(w, req.ID, receipt)
 }
 
-// packUserOp ABI-encodes the UserOperation with its dynamic-length fields
-// (initCode, callData, paymasterAndData) replaced by their keccak256 hashes,
-// matching EntryPoint.sol's internal `pack` function.
-func packUserOp(op types.UserOperation) ([]byte, error) {
-	addressTy, err := abi.NewType("address", "", nil)
-	if err != nil {
-		return nil, err
-	}
-	uint256Ty, err := abi.NewType("uint256", "", nil)
-	if err != nil {
-		return nil, err
-	}
-	bytes32Ty, err := abi.NewType("bytes32", "", nil)
-	if err != nil {
-		return nil, err
-	}
 
-	args := abi.Arguments{
-		{Type: addressTy}, // sender
-		{Type: uint256Ty}, // nonce
-		{Type: bytes32Ty}, // keccak256(initCode)
-		{Type: bytes32Ty}, // keccak256(callData)
-		{Type: uint256Ty}, // callGasLimit
-		{Type: uint256Ty}, // verificationGasLimit
-		{Type: uint256Ty}, // preVerificationGas
-		{Type: uint256Ty}, // maxFeePerGas
-		{Type: uint256Ty}, // maxPriorityFeePerGas
-		{Type: bytes32Ty}, // keccak256(paymasterAndData)
-	}
-
-	var hashInitCode, hashCallData, hashPaymasterAndData [32]byte
-	copy(hashInitCode[:], crypto.Keccak256(op.InitCode))
-	copy(hashCallData[:], crypto.Keccak256(op.CallData))
-	copy(hashPaymasterAndData[:], crypto.Keccak256(op.PaymasterAndData))
-
-	return args.Pack(
-		op.Sender,
-		op.Nonce,
-		hashInitCode,
-		hashCallData,
-		op.CallGasLimit,
-		op.VerificationGasLimit,
-		op.PreVerificationGas,
-		op.MaxFeePerGas,
-		op.MaxPriorityFeePerGas,
-		hashPaymasterAndData,
-	)
-}
 
 func writeResult(w http.ResponseWriter, id json.RawMessage, result interface{}) {
 	resp := RPCResponse{

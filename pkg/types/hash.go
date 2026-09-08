@@ -38,6 +38,12 @@ func packUserOp(op UserOperation) []byte {
 	return packed
 }
 
+// GetUserOpHash computes the EIP-4337 userOpHash:
+//
+//	userOpHash = keccak256(abi.encode(hash(pack(op)), entryPoint, chainId))
+//
+// where pack(op) ABI-encodes the op with initCode/callData/paymasterAndData
+// replaced by their keccak256 hashes (per the EntryPoint reference impl).
 func GetUserOpHash(op UserOperation, entryPoint common.Address, chainID *big.Int) common.Hash {
 	inner := crypto.Keccak256Hash(packUserOp(op))
 	args := abi.Arguments{{Type: mustType("bytes32")}, {Type: mustType("address")}, {Type: mustType("uint256")}}
