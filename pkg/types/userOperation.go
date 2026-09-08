@@ -7,11 +7,11 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 )
 
-type UserOperation struct{
-	Sender   common.Address `json:"sender"`
-	Nonce    *big.Int       `json:"nonce"`
-	InitCode []byte          `json:"initCode"`
-	CallData  []byte         `json:"callData"`
+type UserOperation struct {
+	Sender               common.Address `json:"sender"`
+	Nonce                *big.Int       `json:"nonce"`
+	InitCode             []byte         `json:"initCode"`
+	CallData             []byte         `json:"callData"`
 	CallGasLimit         *big.Int       `json:"callGasLimit"`
 	VerificationGasLimit *big.Int       `json:"verificationGasLimit"`
 	PreVerificationGas   *big.Int       `json:"preVerificationGas"`
@@ -19,12 +19,10 @@ type UserOperation struct{
 	MaxPriorityFeePerGas *big.Int       `json:"maxPriorityFeePerGas"`
 	PaymasterAndData     []byte         `json:"paymasterAndData"`
 	Signature            []byte         `json:"signature"`
-
 }
 
 // RPCUserOperation is the hex-string JSON-RPC wire format (eth_sendUserOperation)
-// receives all numeric/byte fields as 0x-prefixed hex strings not native types
-
+// receives all numeric/byte fields as 0x-prefixed hex strings, not native types.
 type RPCUserOperation struct {
 	Sender               common.Address `json:"sender"`
 	Nonce                hexutil.Big    `json:"nonce"`
@@ -39,11 +37,11 @@ type RPCUserOperation struct {
 	Signature            hexutil.Bytes  `json:"signature"`
 }
 
-func (r RPCUserOperation) ToUserOperation() UserOperation{
+func (r RPCUserOperation) ToUserOperation() UserOperation {
 	return UserOperation{
-		Sender: r.Sender,
-		Nonce: r.Nonce.ToInt(),
-		InitCode: r.InitCode,
+		Sender:               r.Sender,
+		Nonce:                r.Nonce.ToInt(),
+		InitCode:             r.InitCode,
 		CallData:             r.CallData,
 		CallGasLimit:         r.CallGasLimit.ToInt(),
 		VerificationGasLimit: r.VerificationGasLimit.ToInt(),
@@ -52,6 +50,5 @@ func (r RPCUserOperation) ToUserOperation() UserOperation{
 		MaxPriorityFeePerGas: r.MaxPriorityFeePerGas.ToInt(),
 		PaymasterAndData:     r.PaymasterAndData,
 		Signature:            r.Signature,
-
 	}
 }
