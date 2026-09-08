@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 )
 
@@ -32,6 +33,33 @@ type Bundler struct {
 	beneficiary       common.Address
 	bundlerAddress    common.Address
 	bundlerPrivateKey *ecdsa.PrivateKey
+}
+
+// NewBundler constructs a Bundler. bundlerAddress is derived from the
+// private key rather than taken as a separate parameter, since the two
+// must always match — passing both independently invites a mismatch bug.
+func NewBundler(
+	client *ethclient.Client,
+	entryPoint common.Address,
+	entryPointABI abi.ABI,
+	chainID *big.Int,
+	maxOpsPerBundle int,
+	beneficiary common.Address,
+	bundlerPrivateKey *ecdsa.PrivateKey,
+) *Bundler {
+	bundlerAddress := crypto.PubkeyToAddress(bundlerPrivateKey.PublicKey)
+
+	return &Bundler{
+		mempool:           mempool.NewMemPool(),
+		entryPoint:        entryPoint,
+		client:            client,
+		entryPointABI:     entryPointABI,
+		chainID:           chainID,
+		maxOpsPerBundle:   maxOpsPerBundle,
+		beneficiary:       beneficiary,
+		bundlerAddress:    bundlerAddress,
+		bundlerPrivateKey: bundlerPrivateKey,
+	}
 }
 
 // perOpGasOverhead is a rough fixed cost added per UserOperation in a bundle

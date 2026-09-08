@@ -1,0 +1,34 @@
+# Binaries
+/bin/
+/erc4337-bundler
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Go build/test artifacts
+*.test
+*.out
+*.prof
+/vendor/
+
+# Env / secrets — never commit a bundler private key
+.env
+.env.*
+*.pem
+*.key
+
+# Go workspace / module cache leftovers
+go.work
+go.work.sum
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Logs
+*.log

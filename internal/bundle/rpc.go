@@ -1,4 +1,4 @@
-package rpc
+package bundle
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"math/big"
 	"net/http"
 
-	"erc4337-bundler/internal/mempool"
+
 	"erc4337-bundler/internal/validation"
 	"erc4337-bundler/pkg/types"
 
@@ -15,7 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/ethclient"
+
 )
 
 type RPCRequest struct {
@@ -37,16 +37,7 @@ type RPCError struct {
 	Message string `json:"message"`
 }
 
-type Bundler struct {
-	mempool       *mempool.Mempool
-	entryPoint    common.Address
-	client        *ethclient.Client
-	entryPointABI abi.ABI
-	chainID       *big.Int
-	// signer key intentionally omitted here — used only where transactions
-	// are actually submitted (e.g. a separate submission/bundling loop),
-	// not needed for the RPC handlers below.
-}
+
 
 func (b *Bundler) HandleRPC(w http.ResponseWriter, r *http.Request) {
 	var req RPCRequest
